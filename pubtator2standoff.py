@@ -159,12 +159,11 @@ def read_pubtator(fl):
     
     lines = LookaheadIterator(fl)
     while lines:
-        print lines.index
         yield read_pubtator_document(lines)
 
 def write_standoff(document, options=None):
     try:
-        outdir = options.output
+        outdir = options.output if options.output is not None else ''
     except:
         outdir = ''
     try:
