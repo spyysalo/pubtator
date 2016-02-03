@@ -55,14 +55,18 @@ class SpanAnnotation(object):
         if ann_by_id is None:
             ann_by_id = {}
         tid = next_id('T', ann_by_id)
-        nid = next_id('N', ann_by_id)
         t_ann = '%s\t%s %s %s\t%s' % (
             tid, self.type, self.start, self.end, self.text)
-        n_ann = '%s\tReference %s None:%s\t%s' % (
-            nid, tid, self.norm, self.text)
         ann_by_id[tid] = t_ann
-        ann_by_id[nid] = n_ann
-        return [t_ann, n_ann]
+        if not self.norm.strip():
+            return [t_ann]    # No norm
+        else:
+            # If the norm ID lacks a namespace, just add something
+            nid = next_id('N', ann_by_id)
+            norm = self.norm if ':' in self.norm else 'Unknown:%s' % self.norm
+            n_ann = '%s\tReference %s %s\t%s' % (nid, tid, norm, self.text)
+            ann_by_id[nid] = n_ann
+            return [t_ann, n_ann]
         
     @classmethod
     def from_string(cls, s):
