@@ -16,8 +16,8 @@ DEFAULT_ENCODING = 'utf-8'
 # Regular expressions matching PubTator format embedded text, span
 # annotation, and relation annotation.
 TEXT_RE = re.compile(r'^(\d+)\|(.)\|(.*)$')
-SPAN_RE = re.compile(r'^(\d+)\t(\d+)\t(\d+)\t([^\t]+)\t(\S+)\t(\S+)(?:\t(.*))?$')
-REL_RE = re.compile(r'^(\d+)\t(\S+)\t(\S+)\t(\S+)$')
+SPAN_RE = re.compile(r'^(\d+)\t(\d+)\t(\d+)\t([^\t]+)\t(\S+)\t(\S*)(?:\t(.*))?\s*$')
+REL_RE = re.compile(r'^(\d+)\t(\S+)\t(\S+)\t(\S+)\s*$')
 
 def argparser():
     import argparse
@@ -68,7 +68,7 @@ class SpanAnnotation(object):
     def from_string(cls, s):
         m = SPAN_RE.match(s)
         if not m:
-            raise ParseError(s)
+            raise ParseError('Failed to parse as span: "%s"' % s)
         return cls(*m.groups())
         
 class RelationAnnotation(object):
@@ -128,6 +128,8 @@ def read_pubtator_document(fl):
     assert isinstance(fl, LookaheadIterator)
     document_id = None
     document_text = []
+    while not fl.lookahead.strip():
+        next(fl)    # skip initial empty lines
     for line in fl:
         m = TEXT_RE.match(line.rstrip('\n'))
         if not m:
@@ -190,7 +192,7 @@ def pubtator_to_standoff(fn, options=None):
         encoding = options.encoding
     except:
         encoding = DEFAULT_ENCODING
-    with codecs.open(fn, 'rt', encoding=encoding) as fl:
+    with codecs.open(fn, 'rU', encoding=encoding) as fl:
         for document in read_pubtator(fl):
             write_standoff(document, options)
         
