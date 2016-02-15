@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Convert PubTator format to brat-flavored standoff.
+# Convert PubTator format to other formats.
 
 import sys
 import re
@@ -14,7 +14,7 @@ from logging import warn
 
 DEFAULT_ENCODING = 'utf-8'
 
-FORMATS = ['standoff', 'json']
+FORMATS = ['standoff', 'json', 'oa-jsonld']
 DEFAULT_FORMAT = 'standoff'
 
 # Regular expressions matching PubTator format embedded text, span
@@ -96,8 +96,22 @@ class SpanAnnotation(object):
             d['norm'] = self.norm
         return d
 
+    def to_oa_jsonld_dict(self, docurl, idx):
+        d = {
+            '@id' : docurl + '/annotations/%d' % idx,
+            '@type' : self.type,
+            'target' : docurl + '/text#char=%d,%d' % (self.start, self.end),
+            'text': self.text,
+        }
+        if self.norm:
+            d['body'] = self.norm
+        return d
+
     def to_json(self):
         return pretty_dumps(self.to_dict())
+
+    def to_oa_jsonld(self, docurl, idx):
+        return pretty_dumps(self.to_oa_jsonld_dict(docurl, idx))
 
     def to_ann_lines(self, ann_by_id=None):
         # TODO: substrings
@@ -182,10 +196,19 @@ class PubTatorDocument(object):
     def ann_json(self):
         return pretty_dumps(self.ann_dict())
 
+    def ann_oa_jsonld(self):
+        u = 'pubmed/' + self.id
+        return pretty_dumps([
+            a.to_oa_jsonld_dict(u, i) for i, a in enumerate(self.annotations)
+        ])
+
     def to_json(self):
         d = self.text_dict()
         d.update(self.ann_dict())
         return pretty_dumps(d)
+
+    def to_oa_jsonld(self):
+        return self.ann_oa_jsonld()    # TODO: text?
 
 class LookaheadIterator(collections.Iterator):
     """Lookahead iterator from http://stackoverflow.com/a/1518097."""
@@ -204,7 +227,7 @@ class LookaheadIterator(collections.Iterator):
         
     def __nonzero__(self):
         return self.lookahead is not None
-    
+
 def is_text_line(line):
     return TEXT_RE.match(line.rstrip('\n\r'))
 
@@ -249,7 +272,7 @@ def read_pubtator_document(fl):
 
 def read_pubtator(fl):
     """Read PubTator format from file-like object, yield PubTatorDocuments."""
-    
+
     lines = LookaheadIterator(fl)
     while lines:
         yield read_pubtator_document(lines)
@@ -282,6 +305,11 @@ def write_json(document, options=None):
     with codecs.open(outfn, 'wt', encoding=encoding(options)) as out:
         out.write(document.to_json())
 
+def write_oa_jsonld(document, options=None):
+    outfn = output_filename(document, '.jsonld', options)
+    with codecs.open(outfn, 'wt', encoding=encoding(options)) as out:
+        out.write(document.to_oa_jsonld())
+
 def convert(fn, writer, options=None):
     with codecs.open(fn, 'rU', encoding=encoding(options)) as fl:
         for document in read_pubtator(fl):
@@ -294,6 +322,8 @@ def main(argv):
         writer = write_standoff
     elif args.format == 'json':
         writer = write_json
+    elif args.format == 'oa-jsonld':
+        writer = write_oa_jsonld
     else:
         raise ValueError('unknown format %s' % args.format)
 

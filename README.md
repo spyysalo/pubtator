@@ -1,2 +1,3 @@
-# pubtator2standoff
-Conver PubTator format to brat-flavored standoff
+# PubTator format conversion
+
+Conver PubTator format to other formats.
