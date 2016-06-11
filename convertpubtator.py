@@ -284,13 +284,16 @@ def output_filename(document, suffix, options):
         outdir = ''
     return path.join(outdir, document.id + suffix)
 
-def write_standoff(document, options=None):
+def write_text(document, options=None):
     textout = output_filename(document, '.txt', options)
-    annout = output_filename(document, '.ann', options)
     with codecs.open(textout, 'wt', encoding=encoding(options)) as txt:
         txt.write(document.text)
         if not document.text.endswith('\n'):
             txt.write('\n')
+
+def write_standoff(document, options=None):
+    write_text(document, options)
+    annout = output_filename(document, '.ann', options)
     ann_by_id = {}
     with codecs.open(annout, 'wt', encoding=encoding(options)) as ann:
         for pa_ann in document.annotations:
@@ -301,11 +304,13 @@ def write_standoff(document, options=None):
                 print >> ann, so_ann
 
 def write_json(document, options=None):
+    write_text(document, options)
     outfn = output_filename(document, '.json', options)
     with codecs.open(outfn, 'wt', encoding=encoding(options)) as out:
         out.write(document.to_json())
 
 def write_oa_jsonld(document, options=None):
+    write_text(document, options)
     outfn = output_filename(document, '.jsonld', options)
     with codecs.open(outfn, 'wt', encoding=encoding(options)) as out:
         out.write(document.to_oa_jsonld())
