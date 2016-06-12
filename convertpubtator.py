@@ -30,6 +30,8 @@ def argparser():
                     help='Encoding (default %s)' % DEFAULT_ENCODING)
     ap.add_argument('-f', '--format', default=DEFAULT_FORMAT, choices=FORMATS,
                     help='Output format (default %s)' % DEFAULT_FORMAT)
+    ap.add_argument('-i', '--ids', metavar='FILE', default=None,
+                    help='Restrict to documents with IDs in file')
     ap.add_argument('-o', '--output', metavar='DIR', default=None,
                     help='Output directory')
     ap.add_argument('files', metavar='FILE', nargs='+',
@@ -266,16 +268,48 @@ def read_pubtator_document(fl):
         elif is_rel_line(line):
             annotations.append(RelationAnnotation.from_string(line))
         else:
-            raise ParseError('%d: %s' % (fl.index, line))
+            raise ParseError('line %d: %s' % (fl.index, line))
 
     return PubTatorDocument(document_id, text_sections, annotations)
 
-def read_pubtator(fl):
+def skip_pubtator_document(fl, ids):
+    """Skip the next document from LookaheadIterator if its ID is not in
+    the given list, return whether skipped."""
+    if not ids:
+        return False
+    while not fl.lookahead.strip():
+        next(fl)    # skip initial empty lines
+    line = fl.lookahead
+    m = TEXT_RE.match(line.rstrip('\n\r'))
+    if not m:
+        raise ParseError('%d: %s' % (fl.index, line))
+    docid, _, _ = m.groups()
+    if docid in ids:
+        return False
+    for line in fl:
+        if not line.strip():
+            break
+    return True
+
+def recover_from_error(fl):
+    """Skip remaining lines of current document."""
+    assert isinstance(fl, LookaheadIterator)
+    for line in fl:
+        if not line.strip():
+            break
+
+def read_pubtator(fl, ids):
     """Read PubTator format from file-like object, yield PubTatorDocuments."""
 
     lines = LookaheadIterator(fl)
     while lines:
-        yield read_pubtator_document(lines)
+        if skip_pubtator_document(lines, ids):
+            continue
+        try:
+            yield read_pubtator_document(lines)
+        except ParseError, e:
+            warn('Error reading {}: {} (skipping...)'.format(fl.name, e))
+            recover_from_error(lines)
 
 def output_filename(document, suffix, options):
     try:
@@ -317,14 +351,21 @@ def write_oa_jsonld(document, options=None):
 
 def convert(fn, writer, options=None):
     with codecs.open(fn, 'rU', encoding=encoding(options)) as fl:
-        for i, document in enumerate(read_pubtator(fl), start=1):
-            writer(document, options)
+        for i, document in enumerate(read_pubtator(fl, options.ids), start=1):
             if i % 100 == 0:
                 print >> sys.stderr, 'Processed %d documents ...' % i
+            writer(document, options)
     print >> sys.stderr, 'Done, processed %d documents.' % i
+
+def read_id_list(fn):
+    with open(fn) as f:
+        return [l.rstrip('\n') for l in f.readlines()]
 
 def main(argv):
     args = argparser().parse_args(argv[1:])
+
+    if args.ids:
+        args.ids = set(read_id_list(args.ids))
 
     if args.format == 'standoff':
         writer = write_standoff
