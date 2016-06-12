@@ -317,8 +317,11 @@ def write_oa_jsonld(document, options=None):
 
 def convert(fn, writer, options=None):
     with codecs.open(fn, 'rU', encoding=encoding(options)) as fl:
-        for document in read_pubtator(fl):
+        for i, document in enumerate(read_pubtator(fl), start=1):
             writer(document, options)
+            if i % 100 == 0:
+                print >> sys.stderr, 'Processed %d documents ...' % i
+    print >> sys.stderr, 'Done, processed %d documents.' % i
 
 def main(argv):
     args = argparser().parse_args(argv[1:])
