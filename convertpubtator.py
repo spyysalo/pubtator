@@ -104,10 +104,12 @@ class SpanAnnotation(object):
     def to_jsonld_dict(self, docurl, idx, oa=True):
         if oa:
             id_key, type_key = '@id', '@type'
+            id_val = docurl + '/annotations/%d' % idx
         else:
             id_key, type_key = 'id', 'type'
+            id_val = docurl + '/ann/%d' % idx
         d = {
-            id_key : docurl + '/annotations/%d' % idx,
+            id_key : id_val,
             type_key : self.type,
             'target' : docurl + '/text#char=%d,%d' % (self.start, self.end),
             'text': self.text,
@@ -221,7 +223,7 @@ class PubTatorDocument(object):
         ])
 
     def ann_wa_jsonld(self):
-        u = 'pubmed/' + self.id
+        u = 'PMID:' + self.id
         return pretty_dumps([
             a.to_wa_jsonld_dict(u, i) for i, a in enumerate(self.annotations)
         ])
