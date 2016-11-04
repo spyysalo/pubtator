@@ -9,7 +9,8 @@ import collections
 import itertools
 import json
 
-from os import path
+from os import path, makedirs
+from errno import EEXIST
 from logging import warn
 
 DEFAULT_ENCODING = 'utf-8'
@@ -34,6 +35,8 @@ def argparser():
                     help='Restrict to documents with IDs in file')
     ap.add_argument('-o', '--output', metavar='DIR', default=None,
                     help='Output directory')
+    ap.add_argument('-s', '--subdirs', default=True, action='store_true',
+                    help='Create subdirectories by document ID prefix.')
     ap.add_argument('files', metavar='FILE', nargs='+',
                     help='Input PubTator files')
     return ap
@@ -311,11 +314,23 @@ def read_pubtator(fl, ids):
             warn('Error reading {}: {} (skipping...)'.format(fl.name, e))
             recover_from_error(lines)
 
+def safe_makedirs(path):
+    """Create directory path if it doesn't already exist."""
+    # From http://stackoverflow.com/a/5032238
+    try:
+        makedirs(path)
+    except OSError, e:
+        if e.errno != EEXIST:
+            raise
+
 def output_filename(document, suffix, options):
     try:
         outdir = options.output if options.output is not None else ''
     except:
         outdir = ''
+    if options is not None and options.subdirs:
+        outdir = path.join(outdir, document.id[:4])
+    safe_makedirs(outdir)
     return path.join(outdir, document.id + suffix)
 
 def write_text(document, options=None):
