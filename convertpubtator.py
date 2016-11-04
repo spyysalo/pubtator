@@ -101,16 +101,10 @@ class SpanAnnotation(object):
             d['norm'] = self.norm
         return d
 
-    def to_jsonld_dict(self, docurl, idx, oa=True):
-        if oa:
-            id_key, type_key = '@id', '@type'
-            id_val = docurl + '/annotations/%d' % idx
-        else:
-            id_key, type_key = 'id', 'type'
-            id_val = docurl + '/ann/%d' % idx
+    def to_oa_jsonld_dict(self, docurl, idx):
         d = {
-            id_key : id_val,
-            type_key : self.type,
+            '@id' : docurl + '/annotations/%d' % idx,
+            '@type' : self.type,
             'target' : docurl + '/text#char=%d,%d' % (self.start, self.end),
             'text': self.text,
         }
@@ -118,11 +112,19 @@ class SpanAnnotation(object):
             d['body'] = self.norm
         return d
 
-    def to_oa_jsonld_dict(self, docurl, idx):
-        return self.to_jsonld_dict(docurl, idx, oa=True)
-
     def to_wa_jsonld_dict(self, docurl, idx):
-        return self.to_jsonld_dict(docurl, idx, oa=False)
+        d = {
+            'id' : docurl + '/ann/%d' % idx,
+            'type' : 'Span',
+            'target' : docurl + '/text#char=%d,%d' % (self.start, self.end),
+            'body': {
+                'type': self.type,
+            },
+            'text': self.text,
+        }
+        if self.norm:
+            d['body']['id'] = self.norm
+        return d
 
     def to_json(self):
         return pretty_dumps(self.to_dict())
