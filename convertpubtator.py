@@ -35,7 +35,7 @@ def argparser():
                     help='Restrict to documents with IDs in file')
     ap.add_argument('-o', '--output', metavar='DIR', default=None,
                     help='Output directory')
-    ap.add_argument('-s', '--subdirs', default=True, action='store_true',
+    ap.add_argument('-s', '--subdirs', default=False, action='store_true',
                     help='Create subdirectories by document ID prefix.')
     ap.add_argument('files', metavar='FILE', nargs='+',
                     help='Input PubTator files')
