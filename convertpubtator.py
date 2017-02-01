@@ -397,6 +397,7 @@ def write_wa_jsonld(document, options=None):
         out.write(document.to_wa_jsonld())
 
 def convert(fn, writer, options=None):
+    i = 0
     with codecs.open(fn, 'rU', encoding=encoding(options)) as fl:
         for i, document in enumerate(read_pubtator(fl, options.ids), start=1):
             if i % 100 == 0:
