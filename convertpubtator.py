@@ -278,10 +278,10 @@ def read_pubtator_document(fl):
     for line in fl:
         m = TEXT_RE.match(line.rstrip('\n\r'))
         if not m:
-            raise ParseError('%d: %s' % (fl.index, line))
+            raise ParseError('%d: expected text, got: %s' % (fl.index, line))
         docid, type_, text = m.groups()
         if document_id is not None and docid != document_id:
-            raise ParseError('%d: %s' % (fl.index, line))
+            raise ParseError('%d: doc ID mismatch: %s' % (fl.index, line))
         document_id = docid
         if text.strip():
             text_sections.append((type_, text))
