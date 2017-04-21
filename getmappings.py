@@ -7,9 +7,10 @@ from __future__ import print_function
 import sys
 import os
 import json
-
-from logging import info, warn, error
 import logging
+
+from collections import defaultdict
+from logging import info, warn, error
 
 from webannotation import read_annotations, SpanAnnotation
 
@@ -108,11 +109,31 @@ def filter_mappings(mappings, args):
     return mappings
 
 
+def write_statistics(mappings, write=info):
+    mentions = 0
+    strings, amb_strings = len(mappings), 0
+    id_count = defaultdict(int)
+    for mention, mapping in mappings.iteritems():
+        mentions += sum(mapping.values())
+        if len(mapping) > 1:
+            amb_strings += 1
+        for id_ in mapping:
+            id_count[id_] += 1
+    ids, amb_ids = len(id_count), len([i for i, c in id_count.items() if c > 1])
+
+    write('{} strings, {} ({:.1%}) ambiguous'.format(
+        strings, amb_strings, 1.*amb_strings/strings))
+    write('{} ids, {} ({:.1%}) ambiguous'.format(
+        ids, amb_ids, 1.*amb_ids/ids))
+    write('{} total mentions'.format(mentions))
+
+
 def main(argv):
     args = argparser().parse_args(argv[1:])
     mappings, count = process(args.files, args)
     info('Done, processed {} documents.'.format(count))
     mappings = filter_mappings(mappings, args)
+    write_statistics(mappings)
     print(pretty_dumps(mappings))
 
 
