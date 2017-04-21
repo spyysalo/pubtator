@@ -8,6 +8,7 @@ import codecs
 from os import path, makedirs
 from errno import EEXIST
 from logging import warn
+from random import random
 
 from pubtator import read_pubtator
 
@@ -29,6 +30,8 @@ def argparser():
                     help='Restrict to documents with IDs in file')
     ap.add_argument('-o', '--output', metavar='DIR', default=None,
                     help='Output directory')
+    ap.add_argument('-r', '--random', metavar='R', default=None, type=float,
+                    help='Sample random subset of documents')
     ap.add_argument('-s', '--subdirs', default=False, action='store_true',
                     help='Create subdirectories by document ID prefix.')
     ap.add_argument('files', metavar='FILE', nargs='+',
@@ -112,6 +115,8 @@ def convert(fn, writer, options=None):
         for i, document in enumerate(read_pubtator(fl, options.ids), start=1):
             if i % 100 == 0:
                 print >> sys.stderr, 'Processed %d documents ...' % i
+            if options.random is not None and random() > options.random:
+                continue    # skip
             writer(document, options)
     print >> sys.stderr, 'Done, processed %d documents.' % i
 
@@ -126,6 +131,8 @@ def main(argv):
 
     if args.ids:
         args.ids = set(read_id_list(args.ids))
+    if args.random is not None and args.random < 0 or args.random > 1:
+        raise ValueError('must have 0 < ratio < 1')
 
     if args.format == 'standoff':
         writer = write_standoff
