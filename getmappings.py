@@ -24,8 +24,12 @@ def pretty_dumps(obj):
 def argparser():
     import argparse
     ap = argparse.ArgumentParser()
+    ap.add_argument('-c', '--min-count', default=0, type=int,
+                    help='Minimum occurrence count for included mappings')
     ap.add_argument('-r', '--recurse', default=False, action='store_true',
                     help='Recurse into subdirectories')
+    ap.add_argument('-R', '--min-ratio', default=0, type=float,
+                    help='Minimum ratio to most frequent for included mappings')
     ap.add_argument('files', metavar='FILE', nargs='+',
                     help='Input annotation files')
     return ap
@@ -75,10 +79,40 @@ def process(files, args, mappings=None, count=0, recursed=False):
     return mappings, count
 
 
+def filter_mappings(mappings, args):
+    filtered = 0
+
+    if args.min_count > 0:
+        for mention, mapping in mappings.iteritems():
+            for id_ in mapping.keys():
+                if mapping[id_] < args.min_count:
+                    del mapping[id_]
+                    filtered += 1
+
+    if args.min_ratio > 0:
+        for mention, mapping in mappings.iteritems():
+            max_count = max(mapping.values())
+            for id_ in mapping.keys():
+                if 1.*mapping[id_] / max_count < args.min_ratio:
+                    del mapping[id_]
+                    filtered += 1
+
+    kept = 0
+    for mention in mappings.keys():
+        if len(mappings[mention]) == 0:
+            del mappings[mention]
+        else:
+            kept += len(mappings[mention])
+
+    info('Filtered {}, kept {}'.format(filtered, kept))
+    return mappings
+
+
 def main(argv):
     args = argparser().parse_args(argv[1:])
     mappings, count = process(args.files, args)
     info('Done, processed {} documents.'.format(count))
+    mappings = filter_mappings(mappings, args)
     print(pretty_dumps(mappings))
 
 
