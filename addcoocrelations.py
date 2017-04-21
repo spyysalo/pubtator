@@ -6,7 +6,6 @@ from __future__ import print_function
 
 import sys
 import json
-import re
 
 from logging import info, warn, error
 import logging
