@@ -199,11 +199,16 @@ def process(fn):
 def main(argv):
     args = argparser().parse_args(argv[1:])
 
+    errors = 0
     for i, fn in enumerate(args.files, start=1):
-        process(fn)
+        try:
+            process(fn)
+        except Exception, e:
+            logging.error('failed {}: {}'.format(fn, e))
+            errors += 1
         if i % 100 == 0:
             info('Processed {} documents ...'.format(i))
-    info('Done, processed {} documents.'.format(i))
+    info('Done, processed {} documents ({} errors).'.format(i, errors))
 
 
 if __name__ == '__main__':
