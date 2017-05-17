@@ -40,6 +40,8 @@ class Annotation(object):
             raise NotImplementedError('annotation without type: {}'.format(d))
         if d['type'] == 'Span':
             return SpanAnnotation.from_dict(d)
+        elif d['type'] == 'Relation':
+            return RelationAnnotation.from_dict(d)
         else:
             raise NotImplementedError('annotation type {}'.format(d['type']))
 
@@ -64,6 +66,22 @@ class RelationAnnotation(Annotation):
 
     def to_json(self):
         return pretty_dumps(self.to_dict())
+
+    @classmethod
+    def from_dict(cls, d):
+        id_ = d.pop('id')
+        type_ = d.pop('type')
+        target = d.pop('target')
+        body = d.pop('body')
+        if d:
+            warn('RelationAnnotation.from_text: extra data: {}'.format(d))
+        from_ = body.pop('from')
+        to = body.pop('to')
+        rel_type = body.pop('type')
+        if d:
+            warn('RelationAnnotation.from_text: extra data in body: {}'.format(
+                body))
+        return cls(id_, type_, target, from_, to, rel_type)
 
 
 class SpanAnnotation(Annotation):
