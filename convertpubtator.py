@@ -10,7 +10,7 @@ from errno import EEXIST
 from logging import warn
 from random import random
 
-from pubtator import read_pubtator
+from pubtator import read_pubtator, SpanAnnotation
 
 
 DEFAULT_ENCODING = 'utf-8'
@@ -36,6 +36,8 @@ def argparser():
                     help='Sample random subset of documents')
     ap.add_argument('-s', '--subdirs', default=False, action='store_true',
                     help='Create subdirectories by document ID prefix.')
+    ap.add_argument('-ss', '--segment', default=False, action='store_true',
+                    help='Add sentence segmentation annotations.')
     ap.add_argument('files', metavar='FILE', nargs='+',
                     help='Input PubTator files')
     return ap
@@ -113,6 +115,40 @@ def write_wa_jsonld(document, options=None):
         out.write(document.to_wa_jsonld())
 
 
+def add_sentences(document, text=None, base_offset=0):
+    from ssplit import sentence_split
+
+    if text is None:
+        text = document.text
+        base_offset = 0
+
+    if text and not text.isspace():
+        split = sentence_split(text)
+        assert ''.join(split) == text
+        o = 0
+        for s in split:
+            t = s.rstrip()    # omit trailing whitespace
+            from_ = base_offset + o
+            to = base_offset + o + len(t)
+            span = SpanAnnotation(document.id, from_, to, t, 'sentence')
+            document.annotations.append(span)
+            o += len(s)
+
+    return document
+
+
+def segment(document):
+    title, tiab = document.title, document.text
+    if title and not title.isspace():
+        span = SpanAnnotation(document.id, 0, len(title), title, 'title')
+        document.annotations.append(span)
+    abstract = tiab[len(title)+1:]    # +1 for separating whitespace
+    assert title == tiab[:len(title)]
+    add_sentences(document, title, 0)
+    add_sentences(document, abstract, len(title)+1)
+    return document
+
+
 def convert(fn, writer, options=None):
     i = 0
     with codecs.open(fn, 'rU', encoding=encoding(options)) as fl:
@@ -121,6 +157,8 @@ def convert(fn, writer, options=None):
                 print >> sys.stderr, 'Processed %d documents ...' % i
             if options.random is not None and random() > options.random:
                 continue    # skip
+            if options.segment:
+                segment(document)
             writer(document, options)
     print >> sys.stderr, 'Done, processed %d documents.' % i
 
