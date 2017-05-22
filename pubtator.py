@@ -66,7 +66,8 @@ def pretty_dumps(obj):
 class SpanAnnotation(object):
     """PubTator span annotation."""
 
-    def __init__(self, docid, start, end, text, type_, norm, substrings):
+    def __init__(self, docid, start, end, text, type_, norm=None,
+                 substrings=None):
         self.docid = docid
         self.start = int(start)
         self.end = int(end)
@@ -79,7 +80,7 @@ class SpanAnnotation(object):
 
     @property
     def norm(self):
-        if not self._norm.strip():
+        if self._norm is None or not self._norm.strip():
             return None
         elif ':' in self._norm:
             return self._norm
