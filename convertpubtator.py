@@ -28,6 +28,8 @@ def argparser():
                     help='Output format (default %s)' % DEFAULT_FORMAT)
     ap.add_argument('-i', '--ids', metavar='FILE', default=None,
                     help='Restrict to documents with IDs in file')
+    ap.add_argument('-n', '--no-text', default=False, action='store_true',
+                    help='Do not output text files')
     ap.add_argument('-o', '--output', metavar='DIR', default=None,
                     help='Output directory')
     ap.add_argument('-r', '--random', metavar='R', default=None, type=float,
@@ -68,6 +70,8 @@ def output_filename(document, suffix, options):
 
 
 def write_text(document, options=None):
+    if options is not None and options.no_text:
+        return
     textout = output_filename(document, '.txt', options)
     with codecs.open(textout, 'wt', encoding=encoding(options)) as txt:
         txt.write(document.text)
