@@ -34,6 +34,9 @@ class Annotation(object):
     def to_dict(self):
         raise NotImplementedError()
 
+    def remap_ids(self, id_map):
+        self.id = id_map.get(self.id, self.id)
+
     @staticmethod
     def from_dict(d):
         if 'type' not in d:
@@ -66,6 +69,11 @@ class RelationAnnotation(Annotation):
 
     def to_json(self):
         return pretty_dumps(self.to_dict())
+
+    def remap_ids(self, id_map):
+        super(RelationAnnotation, self).remap_ids(id_map)
+        self.body['from'] = id_map.get(self.body['from'], self.body['from'])
+        self.body['to'] = id_map.get(self.body['to'], self.body['to'])
 
     @classmethod
     def from_dict(cls, d):
