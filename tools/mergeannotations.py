@@ -160,7 +160,9 @@ def merge_directories(dirs, relative_path='', options=None):
     union = set.union(*dir_files)
     intersection = set.intersection(*dir_files)
 
-    if union == intersection or (options and options.union):
+    if union == intersection:
+        files = union
+    elif options and options.union:
         files = union
         # Support for --union will require the rest of the code to
         # allow for the possiblity of missing files and directories and
