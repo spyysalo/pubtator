@@ -25,6 +25,8 @@ def pretty_dumps(obj):
 def argparser():
     import argparse
     ap = argparse.ArgumentParser()
+    ap.add_argument('-a', '--all', default=False, action='store_true',
+                    help='Output all mappings')
     ap.add_argument('-c', '--min-count', default=0, type=int,
                     help='Minimum occurrence count for included mappings')
     ap.add_argument('-r', '--recurse', default=False, action='store_true',
@@ -36,7 +38,15 @@ def argparser():
     return ap
 
 
-def process_file(fn, mappings):
+def exclude_mapping(text, id_, type_, options):
+    if options.all:
+        return False
+    # filter cancer hallmarks (sentence-level annotation)
+    if 'hallmark' in type_.lower():
+        return True
+
+
+def process_file(fn, options, mappings):
     try:
         annotations = read_annotations(fn)
     except Exception, e:
@@ -47,7 +57,9 @@ def process_file(fn, mappings):
             continue
         if 'id' not in a.body:
             continue
-        text, id_ = a.text, a.body['id']
+        text, id_, type_ = a.text, a.body['id'], a.body.get('type')
+        if exclude_mapping(text, id_, type_, options):
+            continue
         if text not in mappings:
             mappings[text] = {}
         if id_ not in mappings[text]:
@@ -55,7 +67,7 @@ def process_file(fn, mappings):
         mappings[text][id_] += 1
 
 
-def process(files, args, mappings=None, count=0, recursed=False):
+def process(files, options, mappings=None, count=0, recursed=False):
     if mappings is None:
         mappings = {}
 
@@ -64,12 +76,12 @@ def process(files, args, mappings=None, count=0, recursed=False):
         if recursed and ext == '.txt':
             pass
         elif os.path.isfile(fn):
-            process_file(fn, mappings)
+            process_file(fn, options, mappings)
             count += 1
         elif os.path.isdir(fn):
-            if args.recurse:
+            if options.recurse:
                 df = [os.path.join(fn, n) for n in os.listdir(fn)]
-                mappings, count = process(df, args, mappings, count, True)
+                mappings, count = process(df, options, mappings, count, True)
             else:
                 info('skipping directory {}'.format(fn))
         else:
@@ -80,21 +92,21 @@ def process(files, args, mappings=None, count=0, recursed=False):
     return mappings, count
 
 
-def filter_mappings(mappings, args):
+def filter_mappings(mappings, options):
     filtered = 0
 
-    if args.min_count > 0:
+    if options.min_count > 0:
         for mention, mapping in mappings.iteritems():
             for id_ in mapping.keys():
-                if mapping[id_] < args.min_count:
+                if mapping[id_] < options.min_count:
                     del mapping[id_]
                     filtered += 1
 
-    if args.min_ratio > 0:
+    if options.min_ratio > 0:
         for mention, mapping in mappings.iteritems():
             max_count = max(mapping.values())
             for id_ in mapping.keys():
-                if 1.*mapping[id_] / max_count < args.min_ratio:
+                if 1.*mapping[id_] / max_count < options.min_ratio:
                     del mapping[id_]
                     filtered += 1
 
