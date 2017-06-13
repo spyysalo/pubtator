@@ -160,10 +160,11 @@ class SpanAnnotation(object):
     def norm_namespace(type_):
         """Return namespace for normalizations given annotation type."""
 
+        # prexixes from https://github.com/prefixcommons/biocontext/blob/master/registry/uber_context.jsonld
         if type_ == 'Species':
-            return 'taxonomy'
+            return 'NCBITaxon'
         elif type_ == 'Gene':
-            return 'EGID'    # Entrez gene ID
+            return 'NCBIGENE'    # Entrez gene ID
         elif type_ == 'Chemical':
             return 'MESH'
         else:
