@@ -99,7 +99,7 @@ class SpanAnnotation(object):
             'start': self.start,
             'end': self.end,
             'text': self.text,
-            'type': self.type,
+            'type': self.map_to_output_type(self.type),
         }
         if self.norm:
             d['norm'] = self.norm
@@ -108,7 +108,7 @@ class SpanAnnotation(object):
     def to_oa_jsonld_dict(self, docurl, idx):
         d = {
             '@id' : docurl + '/annotations/%d' % idx,
-            '@type' : self.type,
+            '@type' : self.map_to_output_type(self.type),
             'target' : docurl + '/text#char=%d,%d' % (self.start, self.end),
             'text': self.text,
         }
@@ -122,7 +122,7 @@ class SpanAnnotation(object):
             'type' : 'Span',
             'target' : docurl + '/text#char=%d,%d' % (self.start, self.end),
             'body': {
-                'type': self.type,
+                'type': self.map_to_output_type(self.type),
             },
             'text': self.text,
         }
@@ -145,7 +145,8 @@ class SpanAnnotation(object):
             ann_by_id = {}
         tid = next_in_seq('T', ann_by_id)
         t_ann = '%s\t%s %s %s\t%s' % (
-            tid, self.type, self.start, self.end, self.text)
+            tid, self.map_to_output_type(self.type), self.start, self.end,
+            self.text)
         ann_by_id[tid] = t_ann
         if not self.norm:
             return [t_ann]    # No norm
@@ -173,6 +174,8 @@ class SpanAnnotation(object):
             return 'NCBIGENE'    # Entrez gene ID
         elif type_ == 'Chemical':
             return 'MESH'
+        elif type_ in ('DNAMutation', 'ProteinMutation', 'SNP'):
+            return type_    # see https://github.com/spyysalo/pubtator/issues/4
         else:
             return 'unknown'
 
@@ -185,6 +188,15 @@ class SpanAnnotation(object):
             raise ValueError('failed to strip taxonomy ID from {}'.format(norm))
         else:
             return m.group(1)
+
+    @staticmethod
+    def map_to_output_type(type_):
+        """Map PubTator type to converted type."""
+        # See https://github.com/spyysalo/pubtator/issues/4
+        if type_ in ('DNAMutation', 'ProteinMutation', 'SNP'):
+            return 'Mutation'
+        else:
+            return type_
 
 
 class RelationAnnotation(object):
