@@ -202,7 +202,7 @@ class RelationAnnotation(object):
     def to_json(self):
         return pretty_dumps(self.to_dict())
 
-    def to_ann_lines(self, idseq=0):
+    def to_ann_lines(self, ann_by_id=None):
         # No direct support for document-level relation annotations in
         # .ann output format; skip for now.
         raise NotImplementedError
