@@ -82,11 +82,17 @@ class SpanAnnotation(object):
     def norm(self):
         if self._norm is None or not self._norm.strip():
             return None
-        elif ':' in self._norm:
-            return self._norm
+
+        if not '(Tax:' in self._norm:
+            norm = self._norm
+        else:
+            norm = self.strip_taxonomy_id(self._norm)
+
+        if ':' in norm:
+            return norm
         else:
             # Norm value, but no namespace; add a guess
-            return self.norm_namespace(self.type) + ':' + self._norm
+            return self.norm_namespace(self.type) + ':' + norm
 
     def to_dict(self):
         d = {
@@ -169,6 +175,16 @@ class SpanAnnotation(object):
             return 'MESH'
         else:
             return 'unknown'
+
+    @staticmethod
+    def strip_taxonomy_id(norm):
+        """Return normalizations without taxonomy ID."""
+        # See https://github.com/spyysalo/pubtator/issues/2
+        m = re.match(r'^(\d+)\(Tax:\d+\)$', norm)
+        if not m:
+            raise ValueError('failed to strip taxonomy ID from {}'.format(norm))
+        else:
+            return m.group(1)
 
 
 class RelationAnnotation(object):
