@@ -94,7 +94,7 @@ class SpanAnnotation(object):
             # Norm value, but no namespace; add a guess
             return self.norm_namespace(self.type) + ':' + norm
 
-    def to_dict(self):
+    def to_dicts(self):
         d = {
             'start': self.start,
             'end': self.end,
@@ -103,9 +103,9 @@ class SpanAnnotation(object):
         }
         if self.norm:
             d['norm'] = self.norm
-        return d
+        return [d]
 
-    def to_oa_jsonld_dict(self, docurl, idx):
+    def to_oa_jsonld_dicts(self, docurl, idx):
         d = {
             '@id' : docurl + '/annotations/%d' % idx,
             '@type' : self.map_to_output_type(self.type),
@@ -114,9 +114,9 @@ class SpanAnnotation(object):
         }
         if self.norm:
             d['body'] = self.norm
-        return d
+        return [d]
 
-    def to_wa_jsonld_dict(self, docurl, idx):
+    def to_wa_jsonld_dicts(self, docurl, idx):
         d = {
             'id' : docurl + '/ann/%d' % idx,
             'type' : 'Span',
@@ -128,16 +128,16 @@ class SpanAnnotation(object):
         }
         if self.norm:
             d['body']['id'] = self.norm
-        return d
+        return [d]
 
     def to_json(self):
-        return pretty_dumps(self.to_dict())
+        return pretty_dumps(self.to_dicts())
 
     def to_oa_jsonld(self, docurl, idx):
-        return pretty_dumps(self.to_oa_jsonld_dict(docurl, idx))
+        return pretty_dumps(self.to_oa_jsonld_dicts(docurl, idx))
 
     def to_wa_jsonld(self, docurl, idx):
-        return pretty_dumps(self.to_wa_jsonld_dict(docurl, idx))
+        return pretty_dumps(self.to_wa_jsonld_dicts(docurl, idx))
 
     def to_ann_lines(self, ann_by_id=None):
         # TODO: substrings
@@ -208,11 +208,11 @@ class RelationAnnotation(object):
         self.arg1 = arg1
         self.arg2 = arg2
 
-    def to_dict(self):
+    def to_dicts(self):
         raise NotImplementedError()    # TODO
 
     def to_json(self):
-        return pretty_dumps(self.to_dict())
+        return pretty_dumps(self.to_dicts())
 
     def to_ann_lines(self, ann_by_id=None):
         # No direct support for document-level relation annotations in
@@ -255,7 +255,7 @@ class PubTatorDocument(object):
 
     def ann_dict(self):
         return {
-            'annotations': [ a.to_dict() for a in self.annotations ]
+            'annotations': sum([ a.to_dicts() for a in self.annotations ], [])
         }
 
     def text_json(self):
@@ -266,15 +266,15 @@ class PubTatorDocument(object):
 
     def ann_oa_jsonld(self):
         u = 'pubmed/' + self.id
-        return pretty_dumps([
-            a.to_oa_jsonld_dict(u, i) for i, a in enumerate(self.annotations)
-        ])
+        return pretty_dumps(sum([
+            a.to_oa_jsonld_dicts(u, i) for i, a in enumerate(self.annotations)
+        ], []))
 
     def ann_wa_jsonld(self):
         u = 'PMID:' + self.id
-        return pretty_dumps([
-            a.to_wa_jsonld_dict(u, i) for i, a in enumerate(self.annotations)
-        ])
+        return pretty_dumps(sum([
+            a.to_wa_jsonld_dicts(u, i) for i, a in enumerate(self.annotations)
+        ], []))
 
     def to_json(self):
         d = self.text_dict()
