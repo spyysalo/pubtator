@@ -4,6 +4,7 @@ import re
 import json
 import itertools
 
+from copy import deepcopy
 from collections import Iterator
 from logging import warn
 
@@ -66,33 +67,34 @@ def pretty_dumps(obj):
 class SpanAnnotation(object):
     """PubTator span annotation."""
 
-    def __init__(self, docid, start, end, text, type_, norm=None,
+    def __init__(self, docid, start, end, text, type_, norms=None,
                  substrings=None):
         self.docid = docid
         self.start = int(start)
         self.end = int(end)
         self.text = text
         self.type = type_
-        self._norm = norm
+        self._norms = norms
         # substrings capture cases such as
         #     2234245	314	341	visual or auditory toxicity	Disease	D014786|D006311	visual toxicity|auditory toxicity
         self.substrings = substrings
 
     @property
-    def norm(self):
-        if self._norm is None or not self._norm.strip():
-            return None
+    def norms(self):
+        """Return list of IDs normalized to or [None] if none."""
+        if self._norms is None or not self._norms.strip():
+            return [None]
 
-        if not '(Tax:' in self._norm:
-            norm = self._norm
-        else:
-            norm = self.strip_taxonomy_id(self._norm)
+        norms = []
+        for norm in self.split_norm(self._norms):
+            if '(Tax:' in norm:
+                norm = self.strip_taxonomy_id(norm)
+            if ':' not in norm:
+                # no namespace; add a guess
+                norm = self.norm_namespace(self.type) + ':' + norm
+            norms.append(norm)
 
-        if ':' in norm:
-            return norm
-        else:
-            # Norm value, but no namespace; add a guess
-            return self.norm_namespace(self.type) + ':' + norm
+        return norms
 
     def to_dicts(self):
         d = {
@@ -101,24 +103,31 @@ class SpanAnnotation(object):
             'text': self.text,
             'type': self.map_to_output_type(self.type),
         }
-        if self.norm:
-            d['norm'] = self.norm
-        return [d]
+        dicts = []
+        for norm in self.norms:
+            c = d.copy()
+            if norm:
+                c['norm'] = norm
+            dicts.append(c)
+        return dicts
 
     def to_oa_jsonld_dicts(self, docurl, idx):
         d = {
-            '@id' : docurl + '/annotations/%d' % idx,
             '@type' : self.map_to_output_type(self.type),
             'target' : docurl + '/text#char=%d,%d' % (self.start, self.end),
             'text': self.text,
         }
-        if self.norm:
-            d['body'] = self.norm
-        return [d]
+        dicts = []
+        for i, norm in enumerate(self.norms):
+            c = d.copy()
+            c['@id'] = docurl + '/annotations/%d' % (idx+i)
+            if norm:
+                c['body'] = norm
+            dicts.append(c)
+        return dicts
 
     def to_wa_jsonld_dicts(self, docurl, idx):
         d = {
-            'id' : docurl + '/ann/%d' % idx,
             'type' : 'Span',
             'target' : docurl + '/text#char=%d,%d' % (self.start, self.end),
             'body': {
@@ -126,9 +135,14 @@ class SpanAnnotation(object):
             },
             'text': self.text,
         }
-        if self.norm:
-            d['body']['id'] = self.norm
-        return [d]
+        dicts = []
+        for i, norm in enumerate(self.norms):
+            c = deepcopy(d)
+            c['id'] = docurl + '/ann/%d' % (idx+i)
+            if norm:
+                c['body']['id'] = norm
+            dicts.append(c)
+        return dicts
 
     def to_json(self):
         return pretty_dumps(self.to_dicts())
@@ -148,13 +162,15 @@ class SpanAnnotation(object):
             tid, self.map_to_output_type(self.type), self.start, self.end,
             self.text)
         ann_by_id[tid] = t_ann
-        if not self.norm:
-            return [t_ann]    # No norm
-        else:
+        anns = [t_ann]
+        for norm in self.norms:
+            if not norm:
+                continue
             nid = next_in_seq('N', ann_by_id)
-            n_ann = '%s\tReference %s %s\t%s' % (nid, tid, self.norm, self.text)
+            n_ann = '%s\tReference %s %s\t%s' % (nid, tid, norm, self.text)
             ann_by_id[nid] = n_ann
-            return [t_ann, n_ann]
+            anns.append(n_ann)
+        return anns
 
     @classmethod
     def from_string(cls, s):
@@ -178,6 +194,20 @@ class SpanAnnotation(object):
             return type_    # see https://github.com/spyysalo/pubtator/issues/4
         else:
             return 'unknown'
+
+    @staticmethod
+    def split_norm(norm):
+        """Return list of IDs contained in PubTator normalization value."""
+
+        # PubTator data can contain several IDs in its normalization
+        # field in forms such as the following:
+        # 27086975        1178    1188    SOD1 and 2      Gene    6647;6648
+        # 129280  825     847     5-iodo-2'-deoxyuridine  Chemical        MESH:C029954|MESH:D007065
+
+        if ';' in norm:
+            return norm.split(';')    # TODO '|' separator
+        else:
+            return [norm]
 
     @staticmethod
     def strip_taxonomy_id(norm):
@@ -265,16 +295,16 @@ class PubTatorDocument(object):
         return pretty_dumps(self.ann_dict())
 
     def ann_oa_jsonld(self):
-        u = 'pubmed/' + self.id
-        return pretty_dumps(sum([
-            a.to_oa_jsonld_dicts(u, i) for i, a in enumerate(self.annotations)
-        ], []))
+        d, u = [], 'pubmed/' + self.id
+        for a in self.annotations:
+            d.extend(a.to_oa_jsonld_dicts(u, len(d)))
+        return pretty_dumps(d)
 
     def ann_wa_jsonld(self):
-        u = 'PMID:' + self.id
-        return pretty_dumps(sum([
-            a.to_wa_jsonld_dicts(u, i) for i, a in enumerate(self.annotations)
-        ], []))
+        d, u = [], 'PMID:' + self.id
+        for a in self.annotations:
+            d.extend(a.to_wa_jsonld_dicts(u, len(d)))
+        return pretty_dumps(d)
 
     def to_json(self):
         d = self.text_dict()
