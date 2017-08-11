@@ -86,7 +86,7 @@ class SpanAnnotation(object):
             return [None]
 
         norms = []
-        for norm in self.split_norm(self._norms):
+        for norm in self.split_norm(self._norms, self.type):
             if '(Tax:' in norm:
                 norm = self.strip_taxonomy_id(norm)
             if ':' not in norm:
@@ -196,16 +196,22 @@ class SpanAnnotation(object):
             return 'unknown'
 
     @staticmethod
-    def split_norm(norm):
+    def split_norm(norm, type_):
         """Return list of IDs contained in PubTator normalization value."""
 
         # PubTator data can contain several IDs in its normalization
         # field in forms such as the following:
-        # 27086975        1178    1188    SOD1 and 2      Gene    6647;6648
-        # 129280  825     847     5-iodo-2'-deoxyuridine  Chemical        MESH:C029954|MESH:D007065
+        #     27086975        1178    1188    SOD1 and 2      Gene    6647;6648
+        #     129280  825     847     5-iodo-2'-deoxyuridine  Chemical        MESH:C029954|MESH:D007065
+        # However, norm cannot be split on all '|' characters due to e.g.
+        #     7564788192200677C-->TDNAMutationc|SUB|C|677|T
+        # It appears that '|' is only used as a separator for Chemicals
+        # (as of Aug 2017).
 
         if ';' in norm:
-            return norm.split(';')    # TODO '|' separator
+            return norm.split(';')
+        elif '|' in norm and type_ == 'Chemical':
+            return norm.split('|')
         else:
             return [norm]
 
