@@ -173,7 +173,7 @@ def sentence_cooccurrences(annotations, options=None):
         if s is not None:
             ann_by_sent[s].append(a)
         else:
-            warn('failed to find sentence for annotation')
+            warn('failed to find sentence for annotation {}'.format(a))
 
     # create co-occurrences within each sentence
     relations = []

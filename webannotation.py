@@ -129,6 +129,9 @@ class SpanAnnotation(Annotation):
     def to_json(self):
         return pretty_dumps(self.to_dict())
 
+    def __str__(self):
+        return '{} {} {} ("{}") {}'.format(self.id, self.type, self.target, self.text, self.body)
+
     @classmethod
     def from_dict(cls, d):
         id_ = d.pop('id')
