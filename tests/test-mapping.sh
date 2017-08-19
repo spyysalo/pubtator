@@ -3,5 +3,8 @@
 set -e
 set -u
 
-./test-wa.sh
-python getmappings.py -r test-wa-output/*
+SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+DATADIR="$SCRIPTDIR/../data"
+
+"$SCRIPTDIR/test-wa.sh"
+python "$SCRIPTDIR/../tools/getmappings.py" -r "$DATADIR"/test-wa-output/*

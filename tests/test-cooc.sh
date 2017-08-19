@@ -3,5 +3,8 @@
 set -e
 set -u
 
-./test-wa.sh
-python addcoocrelations.py test-wa-output/*/*.jsonld
+SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+DATADIR="$SCRIPTDIR/../data/test-wa-output"
+
+"$SCRIPTDIR/test-wa.sh"
+python "$SCRIPTDIR/../tools/addcoocrelations.py" "$DATADIR"/*/*.jsonld
