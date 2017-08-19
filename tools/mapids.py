@@ -4,6 +4,7 @@
 
 from __future__ import print_function
 
+import os
 import sys
 import json
 import logging
@@ -25,6 +26,10 @@ def argparser():
     ap = argparse.ArgumentParser()
     ap.add_argument('-p', '--prefix', default='NCBIGENE',
                     help='Namespace prefix of IDs to map')
+    ap.add_argument('-r', '--recurse', default=False, action='store_true',
+                    help='Recurse into subdirectories')
+    ap.add_argument('-s', '--suffix', default='.jsonld',
+                    help='Suffix of files to process (with -r)')
     ap.add_argument('-v', '--verbose', default=False, action='store_true',
                     help='Verbose output')
     ap.add_argument('idmap', metavar='IDFILE',
@@ -96,23 +101,41 @@ def map_file_ids(fn, mapping, options=None):
         pretty_dump(data, f)
 
 
+def map_files_ids(files, mapping, options, count=0, errors=0, recursed=False):
+    for fn in files:
+        _, ext = os.path.splitext(os.path.basename(fn))
+        if os.path.isfile(fn) and recursed and ext != options.suffix:
+            continue
+        elif os.path.isfile(fn):
+            try:
+                map_file_ids(fn, mapping, options)
+            except Exception, e:
+                logging.error('failed {}: {}'.format(fn, e))
+                errors += 1
+            count += 1
+            if count % 100 == 0:
+                info('Processed {} documents ...'.format(count))
+        elif os.path.isdir(fn):
+            if options.recurse:
+                df = [os.path.join(fn, n) for n in os.listdir(fn)]
+                count, errors = map_files_ids(df, mapping, options, count,
+                                              errors, True)
+            else:
+                info('skipping directory {}'.format(fn))
+    if not recursed:
+        info('Done, processed {} documents ({} errors).'.format(count, errors))
+    return count, errors
+
+
 def main(argv):
     args = argparser().parse_args(argv[1:])
     if args.verbose:
         logging.basicConfig(level=logging.INFO)
+
     mapping = read_mapping(args.idmap)
 
-    errors = 0
-    for i, fn in enumerate(args.files, start=1):
-        try:
-            map_file_ids(fn, mapping, args)
-        except Exception, e:
-            logging.error('failed {}: {}'.format(fn, e))
-            errors += 1
-        if i % 100 == 0:
-            info('Processed {} documents ...'.format(i))
+    map_files_ids(args.files, mapping, args)
 
-    info('Done, processed {} documents ({} errors).'.format(i, errors))
     info(map_id_stats())
     return 0
 
