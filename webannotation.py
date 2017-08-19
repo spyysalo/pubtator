@@ -4,11 +4,15 @@ import re
 import json
 
 from urlparse import urldefrag
-from logging import warn
+from logging import warn, error
 
 
 def pretty_dumps(obj):
     return json.dumps(obj, sort_keys=True, indent=2, separators=(',', ': '))
+
+
+class FormatError(Exception):
+    pass
 
 
 class Annotation(object):
@@ -147,9 +151,14 @@ class SpanAnnotation(Annotation):
 def read_jsonld_annotations(fn):
     with open(fn) as f:
         data = json.loads(f.read())
-    annotations = []
+    annotations, ids = [], set()
     for d in data:
-        annotations.append(Annotation.from_dict(d))
+        a = Annotation.from_dict(d)
+        if a.id in ids:
+            raise FormatError('duplicate id in {}: {}'.format(fn, a.id))
+        else:
+            ids.add(a.id)
+        annotations.append(a)
     return annotations
 
 
