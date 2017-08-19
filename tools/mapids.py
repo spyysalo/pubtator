@@ -49,7 +49,8 @@ def read_mapping(fn):
             if len(f) != 3:
                 raise FormatError('expected 3 TAB-separated values, got {} on line {} in {}: {}'.format(len(f), i, fn, l))
             id1, id_type, id2 = f
-            mapping[id1].append((id_type, id2))
+            if (id_type, id2) not in mapping[id1]:
+                mapping[id1].append((id_type, id2))
             read += 1
     info('Read {} from {}'.format(read, fn))
     return mapping
