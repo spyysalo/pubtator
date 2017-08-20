@@ -4,11 +4,12 @@
 
 from __future__ import print_function
 
+import os
 import sys
 import json
 import logging
 
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from logging import debug, info, warn, error
 
 from webannotation import read_annotations, SpanAnnotation, RelationAnnotation
@@ -22,11 +23,15 @@ def argparser():
     ap = argparse.ArgumentParser()
     ap.add_argument('-d', '--distance', metavar='CHARS', type=int, default=None,
                     help='Character distance-based cooc (default sentence)')
-    ap.add_argument('-r', '--include-repeated', default=False,
+    ap.add_argument('-p', '--include-repeated', default=False,
                     action='store_true',
                     help='Include repeated entity cooccurrences in context')
+    ap.add_argument('-r', '--recurse', default=False, action='store_true',
+                    help='Recurse into subdirectories')
     ap.add_argument('-s', '--include-self', default=False, action='store_true',
                     help='Include cooccurrences of entities with themselves')
+    ap.add_argument('-S', '--suffix', default='.jsonld',
+                    help='Suffix of files to process (with -r)')
     ap.add_argument('files', metavar='FILE', nargs='+',
                     help='Input annotation files')
     return ap
@@ -161,7 +166,7 @@ def sentence_cooccurrences(annotations, options=None):
             sent_by_offset[i] = s
 
     # group annotations by sentence
-    ann_by_sent = defaultdict(list)
+    ann_by_sent = OrderedDict()
     for a in anns:
         s = None
         for i in range(a.start, a.end):
@@ -171,9 +176,11 @@ def sentence_cooccurrences(annotations, options=None):
                 # multiple sentences
                 break
         if s is not None:
+            if s not in ann_by_sent:
+                ann_by_sent[s] = []
             ann_by_sent[s].append(a)
         else:
-            warn('failed to find sentence for annotation')
+            warn('failed to find sentence for annotation {}'.format(a))
 
     # create co-occurrences within each sentence
     relations = []
@@ -199,19 +206,35 @@ def process(fn, options=None):
         f.write(pretty_dumps([a.to_dict() for a in annotations]))
 
 
+def process_files(files, options, count=0, errors=0, recursed=False):
+    for fn in files:
+        _, ext = os.path.splitext(os.path.basename(fn))
+        if os.path.isfile(fn) and recursed and ext != options.suffix:
+            continue
+        elif os.path.isfile(fn):
+            try:
+                process(fn, options)
+            except Exception, e:
+                logging.error('failed {}: {}'.format(fn, e))
+                errors += 1
+            count += 1
+            if count % 100 == 0:
+                info('Processed {} documents ...'.format(count))
+        elif os.path.isdir(fn):
+            if options.recurse:
+                df = [os.path.join(fn, n) for n in os.listdir(fn)]
+                count, errors = process_files(df, options, count, errors, True)
+            else:
+                info('skipping directory {}'.format(fn))
+    if not recursed:
+        info('Done, processed {} documents ({} errors).'.format(count, errors))
+    return count, errors
+
+
 def main(argv):
     args = argparser().parse_args(argv[1:])
-
-    errors = 0
-    for i, fn in enumerate(args.files, start=1):
-        try:
-            process(fn, args)
-        except Exception, e:
-            logging.error('failed {}: {}'.format(fn, e))
-            errors += 1
-        if i % 100 == 0:
-            info('Processed {} documents ...'.format(i))
-    info('Done, processed {} documents ({} errors).'.format(i, errors))
+    process_files(args.files, args)
+    return 0
 
 
 if __name__ == '__main__':
