@@ -18,6 +18,10 @@ from webannotation import read_annotations, SpanAnnotation, RelationAnnotation
 logging.basicConfig(level=logging.INFO)
 
 
+class FormatError(Exception):
+    pass
+
+
 def argparser():
     import argparse
     ap = argparse.ArgumentParser()
@@ -199,6 +203,10 @@ def process(fn, options=None):
     except Exception, e:
         error('failed to parse {}: {}'.format(fn, e))
         raise
+    if any(a for a in annotations
+           if (isinstance(a, RelationAnnotation) and
+               a.body.get('type', '').lower() == 'cooccurrence')):
+        raise FormatError('{} already has cooccurrence relation(s)'.format(fn))
     if options and options.distance:
         # Distance-based cooccurrences
         relations = cooccurrences(annotations, options)
