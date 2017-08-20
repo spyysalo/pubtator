@@ -98,8 +98,10 @@ def pair_identity(ann1, ann2):
     return (i1, i2)
 
 
-def cooccurrences(annotations, options=None):
+def cooccurrences(annotations, options=None, next_id=None):
     """Return cooccurrences with optional distance filtering."""
+    if next_id is None:
+        next_id = max_id_base(annotations) + 1
 
     relations = []
     seen = set()
@@ -119,7 +121,6 @@ def cooccurrences(annotations, options=None):
             len(annotations), len(filtered)))
         annotations = filtered
 
-    next_id = max_id_base(annotations) + 1
     for i in range(len(annotations)):
         for j in range(i+1, len(annotations)):
             a, b = annotations[i], annotations[j]
@@ -184,8 +185,11 @@ def sentence_cooccurrences(annotations, options=None):
 
     # create co-occurrences within each sentence
     relations = []
+    next_id = max_id_base(annotations) + 1
     for s, a in ann_by_sent.items():
-        relations.extend(cooccurrences(a))
+        cooc = cooccurrences(a, next_id=next_id)
+        relations.extend(cooc)
+        next_id += len(cooc)
     return relations
 
 
