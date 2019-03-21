@@ -48,7 +48,13 @@ class LookaheadIterator(Iterator):
         self._advance()
         return next(self._it)
 
+    def __next__(self):
+        return self.next()    # TODO cleanup
+
     def __nonzero__(self):
+        return self.lookahead is not None
+
+    def __bool__(self):
         return self.lookahead is not None
 
 
@@ -331,7 +337,7 @@ def skip_pubtator_document(fl, ids):
     if not ids:
         return False
 
-    while not fl.lookahead.strip():
+    while fl.lookahead is not None and not fl.lookahead.strip():
         next(fl)    # skip initial empty lines
 
     line = fl.lookahead
@@ -366,7 +372,7 @@ def read_pubtator_document(fl):
     document_id = None
     text_sections = []
 
-    while not fl.lookahead.strip():
+    while fl.lookahead is not None and not fl.lookahead.strip():
         next(fl)    # skip initial empty lines
 
     for line in fl:
@@ -408,6 +414,6 @@ def read_pubtator(fl, ids):
             continue
         try:
             yield read_pubtator_document(lines)
-        except ParseError, e:
+        except ParseError as e:
             warn('Error reading {}: {} (skipping...)'.format(fl.name, e))
             recover_from_error(lines)
