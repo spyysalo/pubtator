@@ -3,6 +3,7 @@
 # Convert PubTator format to other formats.
 
 import sys
+import gzip
 import logging
 
 from os import path, makedirs
@@ -10,6 +11,7 @@ from errno import EEXIST
 from random import random
 
 from pubtator import read_pubtator, SpanAnnotation
+
 
 logging.basicConfig()
 logger = logging.getLogger('convert')
@@ -155,18 +157,25 @@ def segment(document):
     return document
 
 
-def convert(fn, writer, options=None):
-    i = 0
-    with open(fn, 'rU', encoding=encoding(options)) as fl:
-        for i, document in enumerate(read_pubtator(fl, options.ids), start=1):
-            if i % 100 == 0:
-                info('Processed {} documents ...'.format(i))
-            if options.random is not None and random() > options.random:
-                continue    # skip
-            if options.segment:
-                segment(document)
-            writer(document, options)
+def convert_stream(fn, fl, writer, options=None):
+    for i, document in enumerate(read_pubtator(fl, options.ids), start=1):
+        if i % 100 == 0:
+            info('Processed {} documents ...'.format(i))
+        if options.random is not None and random() > options.random:
+            continue    # skip
+        if options.segment:
+            segment(document)
+        writer(document, options)
     info('Done, processed {} documents.'.format(i))
+
+
+def convert(fn, writer, options=None):
+    if not fn.endswith('.gz'):
+        with open(fn, 'rU', encoding=encoding(options)) as f:
+            return convert_stream(fn, f, writer, options)
+    else:
+        with gzip.open(fn, mode='rt', encoding=encoding(options)) as f:
+            return convert_stream(fn, f, writer, options)
 
 
 def read_id_list(fn):
