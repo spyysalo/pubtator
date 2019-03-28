@@ -7,4 +7,4 @@ SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 DATADIR="$SCRIPTDIR/../data"
 
 "$SCRIPTDIR/test-wa.sh"
-python "$SCRIPTDIR/../tools/getmappings.py" -r "$DATADIR"/test-wa-output/*
+python3 "$SCRIPTDIR/../tools/getmappings.py" -r "$DATADIR"/test-wa-output/*

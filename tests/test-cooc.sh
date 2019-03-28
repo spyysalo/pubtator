@@ -7,4 +7,4 @@ SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 DATADIR="$SCRIPTDIR/../data/test-wa-output"
 
 "$SCRIPTDIR/test-wa.sh"
-python "$SCRIPTDIR/../tools/addcoocrelations.py" -r "$DATADIR"
+python3 "$SCRIPTDIR/../tools/addcoocrelations.py" -r "$DATADIR"

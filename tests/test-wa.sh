@@ -14,6 +14,6 @@ echo "Clearing $OUTDIR" >&2
 rm -rf "$OUTDIR"
 
 echo "Converting $INPUT, output in $OUTDIR" >&2
-python "$CONVERTER" -f wa-jsonld -o "$OUTDIR" -s -ss "$INPUT"
+python3 "$CONVERTER" -f wa-jsonld -o "$OUTDIR" -s -ss "$INPUT"
 
 echo "Done." >&2

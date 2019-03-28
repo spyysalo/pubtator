@@ -2,11 +2,13 @@
 
 # Convert PubTator format to other formats.
 
+import os
 import sys
 import gzip
 import logging
 
-from os import path, makedirs
+from contextlib import contextmanager
+from abc import ABC, abstractmethod
 from errno import EEXIST
 from random import random
 
@@ -17,6 +19,7 @@ logging.basicConfig()
 logger = logging.getLogger('convert')
 debug, info, warn, error = logger.debug, logger.info, logger.warn, logger.error
 
+DEFAULT_OUT='converted'
 
 DEFAULT_ENCODING = 'utf-8'
 
@@ -27,16 +30,20 @@ DEFAULT_FORMAT = 'standoff'
 def argparser():
     import argparse
     ap = argparse.ArgumentParser()
+    ap.add_argument('-D', '--database', default=False, action='store_true',
+                    help='Output to SQLite DB (default filesystem)')
     ap.add_argument('-e', '--encoding', default=DEFAULT_ENCODING,
                     help='Encoding (default {})'.format(DEFAULT_ENCODING))
     ap.add_argument('-f', '--format', default=DEFAULT_FORMAT, choices=FORMATS,
                     help='Output format (default {})'.format(DEFAULT_FORMAT))
     ap.add_argument('-i', '--ids', metavar='FILE', default=None,
                     help='Restrict to documents with IDs in file')
+    ap.add_argument('-l', '--limit', metavar='INT', type=int,
+                    help='Maximum number of documents to output')
     ap.add_argument('-n', '--no-text', default=False, action='store_true',
                     help='Do not output text files')
-    ap.add_argument('-o', '--output', metavar='DIR', default=None,
-                    help='Output directory')
+    ap.add_argument('-o', '--output', default=DEFAULT_OUT,
+                    help='Output dir/db (default {})'.format(DEFAULT_OUT))
     ap.add_argument('-r', '--random', metavar='R', default=None, type=float,
                     help='Sample random subset of documents')
     ap.add_argument('-s', '--subdirs', default=False, action='store_true',
@@ -57,43 +64,117 @@ def encoding(options):
         return DEFAULT_ENCODING
 
 
-def safe_makedirs(path):
+def mkdir_p(path):
     """Create directory path if it doesn't already exist."""
     # From http://stackoverflow.com/a/5032238
     try:
-        makedirs(path)
+        os.makedirs(path)
     except OSError as e:
         if e.errno != EEXIST:
             raise
 
 
 def output_filename(document, suffix, options):
-    try:
-        outdir = options.output if options.output is not None else ''
-    except:
-        outdir = ''
     if options is not None and options.subdirs:
-        outdir = path.join(outdir, document.id[:4])
-    if outdir != '':
-        safe_makedirs(outdir)
-    return path.join(outdir, document.id + suffix)
+        outdir = document.id[:4]
+    else:
+        outdir = ''
+    return os.path.join(outdir, document.id + suffix)
 
 
-def write_text(document, options=None):
+class WriterBase(ABC):
+    """Abstracts over filesystem and DB for output."""
+    @abstractmethod
+    def open(path):
+        pass
+
+
+class FilesystemWriter(WriterBase):
+    def __init__(self, base_dir=None):
+        self.base_dir = base_dir
+        self.known_directories = set()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
+
+    @contextmanager
+    def open(self, path):
+        if self.base_dir is not None and not os.path.isabs(path):
+            path = os.path.join(self.base_dir, path)
+        directory = os.path.dirname(path)
+        if directory not in self.known_directories:
+            mkdir_p(directory)
+            self.known_directories.add(directory)
+        f = open(path, 'w', encoding='utf-8')
+        try:
+            yield f
+        finally:
+            f.close()
+
+
+class SQLiteFile(object):
+    """Minimal file-like object that writes into SQLite DB"""
+    def __init__(self, key, db):
+        self.key = key
+        self.db = db
+        self.data = []
+
+    def write(self, data):
+        self.data.append(data)
+
+    def flush(self):
+        self.db[self.key] = ''.join(self.data)
+        self.db.commit()
+
+    def close(self):
+        self.flush()
+        self.db = None
+
+
+class SQLiteWriter(WriterBase):
+    def __init__(self, dbname):
+        self.dbname = dbname
+        self.db = None
+
+    def __enter__(self):
+        try:
+            import sqlitedict
+        except ImportError:
+            error('failed to import sqlitedict; try `pip3 install sqlitedict`')
+            raise
+        self.db = sqlitedict.SqliteDict(self.dbname, autocommit=True)
+        return self
+
+    def __exit__(self, *args):
+        pass
+
+    @contextmanager
+    def open(self, path):
+        f = SQLiteFile(path, self.db)
+        try:
+            yield f
+        finally:
+            f.close()
+
+
+def write_text(writer, document, options=None):
     if options is not None and options.no_text:
         return
     textout = output_filename(document, '.txt', options)
-    with open(textout, 'w', encoding=encoding(options)) as txt:
+    with writer.open(textout) as txt:
         txt.write(document.text)
         if not document.text.endswith('\n'):
             txt.write('\n')
 
 
-def write_standoff(document, options=None):
-    write_text(document, options)
+def write_standoff(writer, document, options=None):
+    write_text(writer, document, options)
     annout = output_filename(document, '.ann', options)
     ann_by_id = {}
-    with open(annout, 'w', encoding=encoding(options)) as ann:
+    with writer.open(annout) as ann:
         for pa_ann in document.annotations:
             try:
                 for so_ann in pa_ann.to_ann_lines(ann_by_id):
@@ -102,24 +183,24 @@ def write_standoff(document, options=None):
                 warn('not converting {}'.format(type(pa_ann).__name__))
 
 
-def write_json(document, options=None):
-    write_text(document, options)
+def write_json(writer, document, options=None):
+    write_text(writer, document, options)
     outfn = output_filename(document, '.json', options)
-    with open(outfn, 'w', encoding=encoding(options)) as out:
+    with writer.open(outfn) as out:
         out.write(document.to_json())
 
 
-def write_oa_jsonld(document, options=None):
-    write_text(document, options)
+def write_oa_jsonld(writer, document, options=None):
+    write_text(writer, document, options)
     outfn = output_filename(document, '.jsonld', options)
-    with open(outfn, 'w', encoding=encoding(options)) as out:
+    with writer.open(outfn) as out:
         out.write(document.to_oa_jsonld())
 
 
-def write_wa_jsonld(document, options=None):
-    write_text(document, options)
+def write_wa_jsonld(writer, document, options=None):
+    write_text(writer, document, options)
     outfn = output_filename(document, '.jsonld', options)
-    with open(outfn, 'w', encoding=encoding(options)) as out:
+    with writer.open(outfn) as out:
         out.write(document.to_wa_jsonld())
 
 
@@ -157,25 +238,29 @@ def segment(document):
     return document
 
 
-def convert_stream(fn, fl, writer, options=None):
+def convert_stream(fn, fl, writer, write_func, options=None):
     for i, document in enumerate(read_pubtator(fl, options.ids), start=1):
+        if options.limit and convert.total_count >= options.limit:
+            break
         if i % 100 == 0:
             info('Processed {} documents ...'.format(i))
         if options.random is not None and random() > options.random:
             continue    # skip
         if options.segment:
             segment(document)
-        writer(document, options)
-    info('Done, processed {} documents.'.format(i))
+        write_func(writer, document, options)
+        convert.total_count += 1
+    info('Completed {}, processed {} documents.'.format(fn, i))
 
 
-def convert(fn, writer, options=None):
+def convert(fn, writer, write_func, options=None):
     if not fn.endswith('.gz'):
-        with open(fn, 'rU', encoding=encoding(options)) as f:
-            return convert_stream(fn, f, writer, options)
+        with open(fn, encoding=encoding(options)) as f:
+            return convert_stream(fn, f, writer, write_func, options)
     else:
         with gzip.open(fn, mode='rt', encoding=encoding(options)) as f:
-            return convert_stream(fn, f, writer, options)
+            return convert_stream(fn, f, writer, write_func, options)
+convert.total_count = 0
 
 
 def read_id_list(fn):
@@ -194,18 +279,27 @@ def main(argv):
         raise ValueError('must have 0 < ratio < 1')
 
     if args.format == 'standoff':
-        writer = write_standoff
+        write_func = write_standoff
     elif args.format == 'json':
-        writer = write_json
+        write_func = write_json
     elif args.format == 'oa-jsonld':
-        writer = write_oa_jsonld
+        write_func = write_oa_jsonld
     elif args.format == 'wa-jsonld':
-        writer = write_wa_jsonld
+        write_func = write_wa_jsonld
     else:
         raise ValueError('unknown format {}'.format(args.format))
 
-    for fn in args.files:
-        convert(fn, writer, args)
+    name = args.output
+    if not args.database:
+        Writer = FilesystemWriter
+    else:
+        Writer = SQLiteWriter
+        if not name.endswith('.sqlite'):
+            name = name + '.sqlite'
+
+    with Writer(name) as writer:
+        for fn in args.files:
+            convert(fn, writer, write_func, args)
 
 
 if __name__ == '__main__':

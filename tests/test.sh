@@ -16,6 +16,6 @@ rm -rf "$OUTDIR"
 mkdir "$OUTDIR"
 
 echo "Converting $INPUT, output in $OUTDIR" >&2
-python "$CONVERTER" -f standoff -o "$OUTDIR" "$INPUT"
+python3 "$CONVERTER" -f standoff -o "$OUTDIR" "$INPUT"
 
 echo "Done." >&2

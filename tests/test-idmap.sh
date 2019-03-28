@@ -8,5 +8,5 @@ IDMAP="$SCRIPTDIR/../data/samples/NCBIGENE-PRO-idmapping.dat"
 DATADIR="$SCRIPTDIR/../data/test-wa-output"
 
 "$SCRIPTDIR/test-wa.sh"
-#python "$SCRIPTDIR/../tools/mapids.py" -v "$IDMAP" "$DATADIR"/*/*.jsonld
-python "$SCRIPTDIR/../tools/mapids.py" -v -r "$IDMAP" "$DATADIR"
+#python3 "$SCRIPTDIR/../tools/mapids.py" -v "$IDMAP" "$DATADIR"/*/*.jsonld
+python3 "$SCRIPTDIR/../tools/mapids.py" -v -r "$IDMAP" "$DATADIR"
