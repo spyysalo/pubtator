@@ -18,6 +18,9 @@ SPAN_RE = re.compile(r'^(\d+)\t(\d+)\t(\d+)\t([^\t]+)\t(\S+)\t(\S*)(?:\t(.*))?\s
 
 REL_RE = re.compile(r'^(\d+)\t(\S+)\t(\S+)\t(\S+)\s*$')
 
+NORM_RE = re.compile(r'[A-Za-z0-9]')
+
+
 def is_text_line(line):
     return TEXT_RE.match(line.rstrip('\n\r'))
 
@@ -101,6 +104,21 @@ class SpanAnnotation(object):
             norms.append(norm)
 
         return norms
+
+    def validate(self, doc_text):
+        if doc_text[self.start:self.end] != self.text:
+            raise ValueError(
+                'text mismatch: {} in {} ({}-{}): "{}" vs. "{}"'.\
+                format(self.type, self.docid, self.start, self.end,
+                       doc_text[self.start:self.end], self.text)
+            )
+        # NOTE: RE.search() instead of RE.match()
+        if self._norms and not NORM_RE.search(self._norms):
+            raise ValueError(
+                'norm value error: {} "{}" in {} ({}-{}): "{}"'.\
+                format(self.type, self.text, self.docid, self.start, self.end,
+                       self._norms)
+            )
 
     def to_dicts(self):
         d = {
@@ -250,6 +268,9 @@ class RelationAnnotation(object):
         self.arg1 = arg1
         self.arg2 = arg2
 
+    def validate(self, doc_text):
+        pass    # TODO
+
     def to_dicts(self):
         raise NotImplementedError()    # TODO
 
@@ -285,6 +306,11 @@ class PubTatorDocument(object):
     def title(self):
         return ' '.join(text for label, text in self.text_sections
                         if label == 't')
+
+    def validate(self):
+        text = self.text
+        for a in self.annotations:
+            a.validate(text)
 
     def text_dict(self):
         return {
@@ -364,7 +390,7 @@ def recover_from_error(fl):
             break
 
 
-def read_pubtator_document(fl):
+def read_pubtator_document(fl, validate=True):
     """Read from LookaheadIterator, return PubTatorDocument."""
 
     assert isinstance(fl, LookaheadIterator)
@@ -399,10 +425,13 @@ def read_pubtator_document(fl):
         else:
             raise ParseError('line %d: %s' % (fl.index, line))
 
-    return PubTatorDocument(document_id, text_sections, annotations)
+    d = PubTatorDocument(document_id, text_sections, annotations)
+    if validate:
+        d.validate()
+    return d
 
 
-def read_pubtator(fl, ids):
+def read_pubtator(fl, ids, validate=True):
     """Read PubTator format from file-like object, yield PubTatorDocuments.
 
     If ids is not None, only return documents whose ID is in ids.
@@ -410,10 +439,15 @@ def read_pubtator(fl, ids):
 
     lines = LookaheadIterator(fl)
     while lines:
+        start_line = lines.index+1
         if skip_pubtator_document(lines, ids):
             continue
         try:
-            yield read_pubtator_document(lines)
-        except ParseError as e:
-            warn('Error reading {}: {} (skipping...)'.format(fl.name, e))
+            yield read_pubtator_document(lines, validate=validate)
+        except Exception as e:
+            curr_line = lines.index+1
+            warn('Error reading {} (lines {}-{}): {} (skipping...)'.
+                 format(fl.name, start_line, curr_line, e))
+            read_pubtator.errors += 1
             recover_from_error(lines)
+read_pubtator.errors = 0

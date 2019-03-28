@@ -44,6 +44,8 @@ def argparser():
                     help='Do not output text files')
     ap.add_argument('-o', '--output', default=DEFAULT_OUT,
                     help='Output dir/db (default {})'.format(DEFAULT_OUT))
+    ap.add_argument('-O', '--no-output', default=False, action='store_true',
+                    help='Suppress output (debugging)')
     ap.add_argument('-r', '--random', metavar='R', default=None, type=float,
                     help='Sample random subset of documents')
     ap.add_argument('-s', '--subdirs', default=False, action='store_true',
@@ -194,6 +196,10 @@ def write_standoff(writer, document, options=None):
                     print(so_ann, file=ann)
             except NotImplementedError as e:
                 warn('not converting {}'.format(type(pa_ann).__name__))
+            except Exception as e:
+                error('error converting {} in {}: {}({})'.format(
+                    type(pa_ann).__name__, document.id,
+                    type(e).__name__, str(e)))
 
 
 def write_json(writer, document, options=None):
@@ -254,6 +260,7 @@ def segment(document):
 def convert_stream(fn, fl, writer, write_func, options=None):
     if options.limit and convert.total_count >= options.limit:
         return 0
+    i = 0
     for i, document in enumerate(read_pubtator(fl, options.ids), start=1):
         if i % 100 == 0:
             info('Processed {} documents ...'.format(i))
@@ -261,7 +268,10 @@ def convert_stream(fn, fl, writer, write_func, options=None):
             continue    # skip
         if options.segment:
             segment(document)
-        write_func(writer, document, options)
+
+        if not options.no_output:
+            write_func(writer, document, options)
+
         convert.total_count += 1
         if options.limit and convert.total_count >= options.limit:
             break
@@ -315,6 +325,9 @@ def main(argv):
     with Writer(name) as writer:
         for fn in args.files:
             convert(fn, writer, write_func, args)
+
+    print('Done, converted {} ({} errors)'.format(
+        convert.total_count, read_pubtator.errors, file=sys.stderr))
 
 
 if __name__ == '__main__':
