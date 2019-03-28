@@ -17,7 +17,7 @@ from pubtator import read_pubtator, SpanAnnotation
 
 logging.basicConfig()
 logger = logging.getLogger('convert')
-debug, info, warn, error = logger.debug, logger.info, logger.warn, logger.error
+info, warn, error = logger.info, logger.warning, logger.error
 
 DEFAULT_OUT='converted'
 
@@ -117,9 +117,10 @@ class FilesystemWriter(WriterBase):
 
 class SQLiteFile(object):
     """Minimal file-like object that writes into SQLite DB"""
-    def __init__(self, key, db):
+    def __init__(self, key, db, commit_on_flush=False):
         self.key = key
         self.db = db
+        self.commit_on_flush = commit_on_flush
         self.data = []
 
     def write(self, data):
@@ -127,7 +128,8 @@ class SQLiteFile(object):
 
     def flush(self):
         self.db[self.key] = ''.join(self.data)
-        self.db.commit()
+        if self.commit_on_flush:
+            self.db.commit()
 
     def close(self):
         self.flush()
@@ -135,9 +137,16 @@ class SQLiteFile(object):
 
 
 class SQLiteWriter(WriterBase):
-    def __init__(self, dbname):
+    def __init__(self, dbname, commit_interval=10000):
         self.dbname = dbname
+        self.commit_interval = commit_interval
         self.db = None
+        self._count = 0
+
+    def commit(self):
+        info('Committing {} ...'.format(self.dbname))
+        self.db.commit()
+        info('Committed {}'.format(self.dbname))
 
     def __enter__(self):
         try:
@@ -145,19 +154,23 @@ class SQLiteWriter(WriterBase):
         except ImportError:
             error('failed to import sqlitedict; try `pip3 install sqlitedict`')
             raise
-        self.db = sqlitedict.SqliteDict(self.dbname, autocommit=True)
+        self.db = sqlitedict.SqliteDict(self.dbname, autocommit=False)
         return self
 
     def __exit__(self, *args):
-        pass
+        self.commit()
 
     @contextmanager
     def open(self, path):
-        f = SQLiteFile(path, self.db)
+        # commit_on_flush=True makes this 2x slower
+        f = SQLiteFile(path, self.db, commit_on_flush=False)
         try:
             yield f
         finally:
             f.close()
+        self._count += 1
+        if self.commit_interval and self._count % self.commit_interval == 0:
+            self.commit()
 
 
 def write_text(writer, document, options=None):
@@ -239,9 +252,9 @@ def segment(document):
 
 
 def convert_stream(fn, fl, writer, write_func, options=None):
+    if options.limit and convert.total_count >= options.limit:
+        return 0
     for i, document in enumerate(read_pubtator(fl, options.ids), start=1):
-        if options.limit and convert.total_count >= options.limit:
-            break
         if i % 100 == 0:
             info('Processed {} documents ...'.format(i))
         if options.random is not None and random() > options.random:
@@ -250,7 +263,10 @@ def convert_stream(fn, fl, writer, write_func, options=None):
             segment(document)
         write_func(writer, document, options)
         convert.total_count += 1
+        if options.limit and convert.total_count >= options.limit:
+            break
     info('Completed {}, processed {} documents.'.format(fn, i))
+    return i
 
 
 def convert(fn, writer, write_func, options=None):
@@ -272,7 +288,6 @@ def main(argv):
     args = argparser().parse_args(argv[1:])
     if args.verbose:
         logger.setLevel(logging.INFO)
-        set_log_level(logging.INFO)
     if args.ids:
         args.ids = set(read_id_list(args.ids))
     if args.random is not None and (args.random < 0 or args.random > 1):
