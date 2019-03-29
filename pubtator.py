@@ -385,8 +385,10 @@ def recover_from_error(fl):
     """Skip remaining lines of current document."""
 
     assert isinstance(fl, LookaheadIterator)
+    if fl.lookahead is None or is_text_line(fl.lookahead):
+        return    # already at end or new doc
     for line in fl:
-        if not line.strip():
+        if is_text_line(fl.lookahead):
             break
 
 
