@@ -5,7 +5,7 @@ import json
 import itertools
 
 from copy import deepcopy
-from collections import Iterator
+from collections.abc import Iterator
 from logging import warn
 
 
