@@ -6,7 +6,7 @@ import itertools
 
 from copy import deepcopy
 from collections.abc import Iterator
-from logging import warn
+from logging import warning
 
 
 # Regular expressions matching PubTator format embedded text, span
@@ -107,7 +107,7 @@ class SpanAnnotation(object):
 
     def validate(self, doc_text):
         if doc_text[self.start:self.end] != self.text:
-            raise ValueError(
+            warning(
                 'text mismatch: {} in {} ({}-{}): "{}" vs. "{}"'.\
                 format(self.type, self.docid, self.start, self.end,
                        doc_text[self.start:self.end], self.text)
@@ -448,8 +448,8 @@ def read_pubtator(fl, ids, validate=True):
             yield read_pubtator_document(lines, validate=validate)
         except Exception as e:
             curr_line = lines.index+1
-            warn('Error reading {} (lines {}-{}): {} (skipping...)'.
-                 format(fl.name, start_line, curr_line, e))
+            warning('Error reading {} (lines {}-{}): {} (skipping...)'.
+                    format(fl.name, start_line, curr_line, e))
             read_pubtator.errors += 1
             recover_from_error(lines)
 read_pubtator.errors = 0
