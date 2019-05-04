@@ -14,7 +14,7 @@ from logging import warning
 
 TEXT_RE = re.compile(r'^(\d+)\|(.)\|(.*)$')
 
-SPAN_RE = re.compile(r'^(\d+)\t(\d+)\t(\d+)\t([^\t]+)\t(\S+)\t(\S*)(?:\t(.*))?\s*$')
+SPAN_RE = re.compile(r'^(\d+)\t(\d+)\t(\d+)\t([^\t]+)\t(\S+)\t*(\S*)(?:\t(.*))?\s*$')
 
 REL_RE = re.compile(r'^(\d+)\t(\S+)\t(\S+)\t(\S+)\s*$')
 
@@ -388,7 +388,7 @@ def recover_from_error(fl):
     if fl.lookahead is None or is_text_line(fl.lookahead):
         return    # already at end or new doc
     for line in fl:
-        if is_text_line(fl.lookahead):
+        if fl.lookahead is not None and is_text_line(fl.lookahead):
             break
 
 
