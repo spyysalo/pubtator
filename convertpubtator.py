@@ -13,6 +13,7 @@ from errno import EEXIST
 from random import random
 
 from pubtator import read_pubtator, SpanAnnotation
+from dictionary import SPECIES_NOMINALS
 
 
 logging.basicConfig()
@@ -48,6 +49,9 @@ def argparser():
                     help='Suppress output (debugging)')
     ap.add_argument('-r', '--random', metavar='R', default=None, type=float,
                     help='Sample random subset of documents')
+    ap.add_argument('-rn', '--retype-nominal', default=False,
+                    action='store_true',
+                    help='Retype nominal mentions')
     ap.add_argument('-s', '--subdirs', default=False, action='store_true',
                     help='Create subdirectories by document ID prefix.')
     ap.add_argument('-ss', '--segment', default=False, action='store_true',
@@ -223,6 +227,22 @@ def write_wa_jsonld(writer, document, options=None):
         out.write(document.to_wa_jsonld())
 
 
+def is_nominal_mention(a):
+    if not isinstance(a, SpanAnnotation):
+        return False
+    if a.type == 'Species':
+        return a.text.lower() in SPECIES_NOMINALS
+    else:
+        return False    # No nominals for the type
+
+
+def retype_nominal_mentions(document):
+    """Assign separate types to nominal mentions such as "patients"."""
+    for a in document.annotations:
+        if is_nominal_mention(a):
+            a.type = 'Nominal-{}'.format(a.type)
+
+
 def add_sentences(document, text=None, base_offset=0):
     from ssplit import sentence_split
 
@@ -268,6 +288,8 @@ def convert_stream(fn, fl, writer, write_func, options=None):
             continue    # skip
         if options.segment:
             segment(document)
+        if options.retype_nominal:
+            retype_nominal_mentions(document)
 
         if not options.no_output:
             write_func(writer, document, options)
