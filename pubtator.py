@@ -208,13 +208,16 @@ class SpanAnnotation(object):
         """Return namespace for normalizations given annotation type."""
 
         # prexixes from https://github.com/prefixcommons/biocontext/blob/master/registry/uber_context.jsonld
-        if type_ == 'Species':
+        # Note: this checks for containment instead of equality to allow
+        # for "modified" types like "Species-Nomical".
+        if 'Species' in type_:
             return 'NCBITaxon'
-        elif type_ == 'Gene':
+        elif 'Gene' in type_:
             return 'NCBIGENE'    # Entrez gene ID
-        elif type_ == 'Chemical':
+        elif 'Chemical' in type_:
             return 'MESH'
-        elif type_ in ('DNAMutation', 'ProteinMutation', 'SNP'):
+        elif any(t for t in ('DNAMutation', 'ProteinMutation', 'SNP')
+                 if t in type_):
             return type_    # see https://github.com/spyysalo/pubtator/issues/4
         else:
             return 'unknown'
