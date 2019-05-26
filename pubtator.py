@@ -436,7 +436,7 @@ def read_pubtator_document(fl, validate=True):
     return d
 
 
-def read_pubtator(fl, ids, validate=True):
+def read_pubtator(fl, ids=None, validate=True):
     """Read PubTator format from file-like object, yield PubTatorDocuments.
 
     If ids is not None, only return documents whose ID is in ids.
